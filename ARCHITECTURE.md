@@ -164,6 +164,11 @@ Full conventions: `iac/docs/grpc-conventions.md`. Manifest skeleton:
 - **Redis** — single instance, AOF `everysec` + RDB. Hot control state only:
   counters, throttles, short-lived tokens. Written cluster-mode-ready by
   construction (single-key ops only), so it can shard later without an app rewrite.
+  **`maxmemory-policy` must be `noeviction`**: products such as
+  `the-button-service` depend on specific keys (e.g. `counter:global`,
+  `applied:*` idempotency markers) never being evicted under memory pressure —
+  an eviction there silently corrupts exactly-once accounting the same way a
+  data loss would.
 - **RabbitMQ** — single node, topic exchange `events`. The transport behind SSE.
   The request path never depends on it: if RabbitMQ is down, SSE fails and clients
   fall back to polling, but reads and writes keep working.
