@@ -14,6 +14,7 @@ product catalog.
 
 | Product | Description | Status | Links |
 | ------- | ----------- | ------ | ----- |
+| The Button | One global click counter; PoW-gated mashing, troll achievements | building | [spec](products/the-button.md) · [service](https://github.com/the-algovn/the-button-service) |
 
 Status flow: `idea` → `spec` → `building` → `live`. Status is tracked only
 in this table.
