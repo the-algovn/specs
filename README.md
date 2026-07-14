@@ -17,10 +17,10 @@ runbooks and the API/gRPC/authnz conventions).
 
 | Product | Description | Status | Links |
 | ------- | ----------- | ------ | ----- |
-| The Button | One global click counter; PoW-gated mashing, troll achievements | building | [spec](products/the-button.md) · [service](https://github.com/the-algovn/the-button-service) |
+| The Button | One global click counter; PoW-gated mashing, troll achievements | live | [spec](products/the-button.md) · [service](https://github.com/the-algovn/the-button-service) · [live](https://algovn.com/the-button) |
 
-The Button's backend and platform prerequisites are complete; it is not deployed
-and has no frontend yet. See [`ROADMAP.md`](ROADMAP.md).
+The Button is live at [algovn.com/the-button](https://algovn.com/the-button). See
+[`products/the-button.md`](products/the-button.md) for known limits.
 
 Status flow: `idea` → `spec` → `building` → `live`. Status is tracked only
 in this table.
