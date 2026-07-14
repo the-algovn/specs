@@ -50,13 +50,16 @@ only way state reaches the cluster.
 ## Cluster
 
 Two nodes, k3s, Argo CD app-of-apps with automated sync, self-heal and prune.
-Drift is reverted; sync history is the audit log.
+Drift is reverted; sync history is the audit log. Since 2026-07-15 both nodes are
+VMs on a single Proxmox VE host (192.168.102.100) — no real HA; the split exists
+for blast-radius isolation and node-rebuild practice. The host also runs home-lab
+LXCs (OpenBao, AdGuard, NAS) outside the cluster.
 
-- **`algovn`** — Raspberry Pi 5, 4-core, 4GB. Runs the platform's control plane.
-  The 4GB budget is the reason for several choices below (VictoriaMetrics over
-  Prometheus, Argo CD slim, no tracing backend).
-- **`algovn-w1`** — i9 / 32GB worker. Runs Postgres, Redis, RabbitMQ, VictoriaMetrics,
-  Loki, and the workloads that need headroom.
+- **`algovn`** — 4 vCPU / 8GB VM (.111). Runs the platform's control plane. The
+  lightweight stack choices below (VictoriaMetrics over Prometheus, Argo CD slim,
+  no tracing backend) date from the Pi-era 4GB budget and are kept on merit.
+- **`algovn-w1`** — 8 vCPU / 16GB VM (.112). Runs Postgres, Redis, RabbitMQ,
+  VictoriaMetrics, Loki, and the workloads that need headroom.
 
 **Exposure** is Cloudflare Tunnel only — no open ports, home IP hidden, works
 behind CGNAT. `external-dns` watches Ingresses and manages the CNAMEs, so
@@ -64,9 +67,11 @@ publishing a service is declarative. `cert-manager` issues a wildcard
 `*.algovn.com` via DNS-01 so LAN/fallback access keeps real TLS even when the
 tunnel is down.
 
-**Secrets** are Sealed Secrets; plaintext never touches git (the repo is public).
-The root of trust is the sealing key plus Zitadel's masterkey, both in the
-password manager. A rebuild needs both.
+**Secrets** live in OpenBao (Vault-compatible, in an LXC on the Proxmox host —
+outside the cluster, so the root of trust survives cluster rebuilds) and sync in
+via External Secrets Operator; the public repo holds only ExternalSecret
+references. A rebuild needs exactly one manual secret step: creating ESO's
+AppRole bootstrap Secret from the host's keyfiles (`iac/docs/runbooks/secrets.md`).
 
 > **There are no backups.** Persistent volume data — identities, click counters,
 > Loki history — is lost if `algovn-w1`'s disk dies. This is an accepted,
@@ -159,7 +164,7 @@ Full conventions: `iac/docs/grpc-conventions.md`. Manifest skeleton:
 ## Data
 
 - **Postgres** — one shared CNPG cluster on `algovn-w1`. Each product gets its own
-  database and owner role, declaratively onboarded, credentials sealed. Currently
+  database and owner role, declaratively onboarded, credentials in OpenBao. Currently
   hosts `zitadel` and `openfga`.
 - **Redis** — single instance, AOF `everysec` + RDB. Hot control state only:
   counters, throttles, short-lived tokens. Written cluster-mode-ready by
