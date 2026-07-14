@@ -23,14 +23,24 @@ SPA is deployed and registered with the API gateway; login, clicks, the live SSE
 counter and achievements all work in production.
 
 Known limits, measured honestly: the concurrency target is 10,000 simultaneous
-users, but the 2026-07-14 SSE load test broke at ~7,300-7,500 concurrent
-connections — a cloudflared tunnel pod ran out of memory (since resized; a re-test
-to confirm 10k holds has not yet been reported). The authenticated click-soak
-(real proof-of-work submits through the gateway) was not run; write-path evidence
-is a direct in-cluster Postgres soak (981 batch-txn/s, matching the 750 txn/s
-engineered ceiling with margin) plus the service's integration tests. See
-`iac/docs/load-results-the-button.md` and `iac/docs/runbooks/the-button.md` for
-the full evidence and operational knobs.
+users. **10,000 has never been reached. 5,000 is the only figure proven to hold** —
+it does so cleanly and repeatably (zero failures across three 2026-07-14 ramps).
+Above that, a hard HTTP 503 wall appears somewhere between ~5.5k and ~8.2k. It is
+**not** our servers: the original cloudflared memory OOM was found and fixed, and
+the wall persists with cloudflared at a third of its memory limit, Kong idle and
+the API gateway at 110Mi of 1Gi. It sits at the Cloudflare edge, and doubling the
+tunnel's edge connections did not move it (half the new pods were left unused).
+
+Crucially, **every test so far ran from a single source IP, which cannot tell a
+per-IP edge cap apart from a real global ceiling** — so 5.5k–8.2k is a *floor*, not
+this system's capacity, and the true multi-client number is unknown and plausibly
+much higher. Settling it needs a distributed, multi-IP load test. One caveat worth
+knowing: at tunnel saturation the *whole* `api.algovn.com` host 503s, not just the
+SSE path. The authenticated click-soak (real proof-of-work submits through the
+gateway) was not run; write-path evidence is a direct in-cluster Postgres soak (981
+batch-txn/s, matching the 750 txn/s engineered ceiling with margin) plus the
+service's integration tests. See `iac/docs/load-results-the-button.md` and
+`iac/docs/runbooks/the-button.md` for the full evidence and operational knobs.
 
 **How it works:** clicks are batched in the browser and each batch pays a
 hashcash-style proof of work, with difficulty scaling to server load; a hard
