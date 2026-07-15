@@ -129,10 +129,12 @@ what every product would otherwise rebuild:
   Kong's jwt plugin: one host mixes anonymous and protected routes, and auth
   config belongs next to auth enforcement. Per-route rules are `anonymous`,
   `authenticated`, or `role:<r>`.
-- **Transcoding** — `POST /<prefix>/<fully.qualified.Service>/<Method>` with a JSON
-  body, mapped to a unary gRPC call via `dynamicpb`. Descriptors come from gRPC
-  server reflection on the upstream. Zero per-method config. Internal services
-  stay pure gRPC and never learn about HTTP.
+- **Transcoding** — each gRPC method is exposed at an explicit HTTP verb + path
+  declared in the registration (e.g. `GET /the-button/counter`), with a JSON body
+  mapped to a unary gRPC call via `dynamicpb`. Method descriptors come from gRPC
+  server reflection on the upstream; the registration's `routes` list is the
+  authoritative allowlist of exposed endpoints. Internal services stay pure gRPC
+  and never learn about HTTP.
 - **Realtime** — one shared SSE fan-out. A service publishes JSON to the RabbitMQ
   topic exchange `events` with a routing key of `<product>.<topic>`; browsers
   subscribe at `GET /events/<channel>`. No replay or history: channels carry
