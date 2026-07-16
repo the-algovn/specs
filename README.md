@@ -18,7 +18,7 @@ runbooks and the API/gRPC/authnz conventions).
 | Product | Description | Status | Links |
 | ------- | ----------- | ------ | ----- |
 | The Button | One global click counter; PoW-gated mashing, troll achievements | live | [spec](products/the-button.md) · [service](https://github.com/the-algovn/the-button-service) · [live](https://algovn.com/the-button) |
-| Tần Số 42 | AI Vietnamese radio: song requests, on-air dedications, an AI DJ streaming 24/7 | spec | [spec](products/radio.md) |
+| Tần Số 42 | AI Vietnamese radio: song requests, on-air dedications, an AI DJ streaming 24/7 | building | [spec](products/radio.md) · [service](https://github.com/the-algovn/radio-service) |
 
 The Button is live at [algovn.com/the-button](https://algovn.com/the-button). See
 [`products/the-button.md`](products/the-button.md) for known limits.
