@@ -5,8 +5,9 @@ the README portfolio table.
 
 ## Now
 
-**Tần Số 42** — spec approved (2026-07-16); implementation planning is the
-next step. See [`products/radio.md`](products/radio.md).
+**Tần Số 42** — spec approved (2026-07-16). Phase 0 builds first: the
+shared admin console + component lab ([`products/radio/lab.md`](products/radio/lab.md)),
+then the broadcast phases. See [`products/radio.md`](products/radio.md).
 
 The Button shipped (2026-07) — see
 [`products/the-button.md`](products/the-button.md) for status and known limits.

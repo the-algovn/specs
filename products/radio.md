@@ -22,6 +22,9 @@ licensing story is claimed.
 
 This file is the product spec. The subsystem designs live next to it:
 
+- [`radio/lab.md`](radio/lab.md) — Phase 0: the shared admin console and
+  component lab that de-risk voice, scripts, ingest and rendering before
+  the broadcast is built.
 - [`radio/architecture.md`](radio/architecture.md) — the detailed system
   architecture: modules, flows, contract, schema, deployment inventory,
   config surface, capacity.
@@ -226,6 +229,11 @@ something" alarm). One provisioned Grafana dashboard: the station console.
 
 ## Phases
 
+0. **The lab** — the platform console (`web/apps/console`) + `radio-lab`
+   bench: audition voices, tune the persona, validate yt-dlp and the
+   render recipe, record fixtures — local-only, real auth, real protos
+   (`algovn.radiolab.v1`). Exits with the voice, model, persona and render
+   defaults chosen. See [`radio/lab.md`](radio/lab.md).
 1. **MVP on air** — YouTube playlist-import seeding, library auto-rotation
    (no-repeat shuffle), public HLS stream + Cloudflare cache rule, SPA
    player with ear-synced now-playing, call-in requests end to end (parse +
