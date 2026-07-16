@@ -11,9 +11,10 @@ pinned yt-dlp binary.
 
 **Update strategy** — YouTube breaks extractors on their schedule, not our
 release schedule, so a broken yt-dlp must not require an image rebuild: at
-pod start (and nightly) the studio fetches the latest yt-dlp release binary
-to the PVC, checksum-verified, and falls back to the baked-in binary if the
-fetch fails or the fetched binary errors. The resilience property that
+pod start (and nightly) each pod refreshes the latest yt-dlp release binary
+into its own emptyDir (api needs it for search, studio for downloads),
+checksum-verified, falling back to the baked-in binary if the fetch fails
+or the fetched binary errors. The resilience property that
 matters: **broadcast never touches yt-dlp** — when YouTube breaks it, only
 new ingests stall; rotation plays on from the library.
 

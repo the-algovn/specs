@@ -22,6 +22,9 @@ licensing story is claimed.
 
 This file is the product spec. The subsystem designs live next to it:
 
+- [`radio/architecture.md`](radio/architecture.md) — the detailed system
+  architecture: modules, flows, contract, schema, deployment inventory,
+  config surface, capacity.
 - [`radio/audio-path.md`](radio/audio-path.md) — rendering, HLS publishing,
   presence, the format clock.
 - [`radio/ingest.md`](radio/ingest.md) — how music gets in: search, ranking,
@@ -58,8 +61,10 @@ so public spikes are absorbed by Cloudflare's cache rather than the uplink.
 
 ## Architecture
 
-One new repo, `radio-service` (Go), two binaries sharing one codebase, the
-`radio` database in the shared CNPG cluster, and Redis:
+One new repo, `radio-service` (Go): **one container image, two
+entrypoints**, sharing one codebase, the `radio` database in the shared
+CNPG cluster, and Redis (full detail:
+[`radio/architecture.md`](radio/architecture.md)):
 
 - **`radio-api`** — a standard platform citizen: pure gRPC :9090
   (`algovn.radio.v1` in `protos`), metrics :9091. Call-in parsing +
