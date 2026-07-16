@@ -46,7 +46,8 @@ This file is the product spec. The subsystem designs live next to it:
   weight: a casual "chào cả nhà" gets a warm line, a birthday confession
   gets the full đêm-khuya treatment.
 - Now-playing, queue peek ("sắp phát") and history in the SPA — synced to
-  what you *hear*, not to the server clock.
+  what you *hear*, not to the server clock. The queue never reveals a
+  dedication's recipient before it airs — no spoiled surprises.
 - The chatty format clock: a talk slot every 1–2 songs (intros, backsells,
   musings, dedications), the hourly station ID, weather color for Hà Nội and
   TP.HCM.
@@ -69,7 +70,8 @@ CNPG cluster, and Redis (full detail:
 - **`radio-api`** — a standard platform citizen: pure gRPC :9090
   (`algovn.radio.v1` in `protos`), metrics :9091. Call-in parsing +
   moderation (one LLM call), track resolution previews, request/shoutout
-  intake, queue and history reads, admin ops (`role:radio-admin`).
+  intake, queue and history reads, admin ops (`role:admin` — coarse, per
+  platform authnz conventions).
 - **`radio-studio`** — the broadcast engine. Single-replica Deployment on
   `algovn-w1`: program-director loop, DJ brain (LLM), TTS, ffmpeg rendering,
   HLS publishing, and the ingest workers (it owns the media PVC). An nginx
@@ -80,7 +82,7 @@ listeners ─▶ Cloudflare (segments edge-cached) ─▶ Kong
                                                    ├─ algovn.com/radio/        → radio SPA (static)
                                                    ├─ algovn.com/radio/stream/ → studio nginx (live.m3u8 + segments)
                                                    └─ api.algovn.com/radio/*   → api-control-plane ─gRPC→ radio-api
-radio-studio ─renders─▶ HLS volume (◀─ nginx)      api.algovn.com/events/radio.* (SSE)
+radio-studio ─renders─▶ HLS volume (◀─ nginx)      api.algovn.com/events/<channel> (SSE)
      │  └─now-playing─▶ RabbitMQ "events" ────────────┘
      └─jobs/state─▶ Postgres `radio` + Redis ◀── radio-api
 ```
@@ -128,16 +130,20 @@ ever need them.
 | `POST /radio/requests` | authenticated | confirm a candidate (+ dedication) → queue |
 | `GET /radio/requests/mine` | authenticated | my requests + statuses |
 | `POST /radio/shoutouts` | authenticated | standalone on-air message |
-| `POST /radio/admin/import` | role:radio-admin | YouTube playlist URL → seed ingest |
-| `POST /radio/admin/skip`, `DELETE /radio/admin/requests/{id}` | role:radio-admin | on-air control |
+| `POST /radio/admin/import` | role:admin | YouTube playlist URL → seed ingest |
+| `POST /radio/admin/skip`, `POST /radio/admin/requests/remove` | role:admin | on-air control (ids in body — registration paths allow no parameters) |
 
-Exact verb/path/field mapping is fixed at implementation time against
+The registration also declares the SSE channels — `radio.nowplaying` and
+`radio.queue`, both `anonymous` (native EventSource cannot send an
+Authorization header; the SPA opens one EventSource per channel). Exact
+verb/path/field mapping is fixed at implementation time against
 `iac/docs/api-conventions.md`.
 
 ## Queue policy
 
 Round-robin across requesters, FIFO within one user. Quotas: 3 pending and
-10/day per user. Duplicates handled warmly: if the track is already queued,
+10 per day per user (days — like every station clock — are
+Asia/Ho_Chi_Minh). Duplicates handled warmly: if the track is already queued,
 a second dedication **merges** onto the same play; if it aired < 2 h ago,
 friendly reject — "vừa phát xong, để khuya nhé". Requesting while the
 station is in music-only mode just works: the requester's own presence
@@ -146,6 +152,9 @@ heartbeat wakes the DJ.
 **Request lifecycle:** submit → parse+moderation → `approved` → ingest (if
 not cached) → `ready` → queued → rendered → `aired`; failures become
 `failed` with the user notified — the DJ never announces a failure.
+Shoutouts ride the same parse+moderation call (they simply lack a song
+query) and the same states minus the ingest steps: pending → approved →
+aired (or rejected).
 
 ## Abuse & safety
 
@@ -158,7 +167,7 @@ not cached) → `ready` → queued → rendered → `aired`; failures become
 - **Budget cap:** a Redis daily spend counter (TTS chars + LLM tokens priced
   at write time, audited in `dj_segments`) enforces a configurable hard
   ceiling, default **$1/day**. At the cap: music-only mode + canned
-  segments, Telegram alert, resets at midnight.
+  segments, Telegram alert, resets at midnight Asia/Ho_Chi_Minh.
 - Prompt injection is a real input class; the rails live in
   [`radio/dj-brain.md`](radio/dj-brain.md) and
   [`radio/ingest.md`](radio/ingest.md).
@@ -166,7 +175,7 @@ not cached) → `ready` → queued → rendered → `aired`; failures become
 ## Failure modes
 
 The station never dies; it gets quieter. LLM down → canned script templates.
-TTS down → pre-rendered canned audio, then music-only with jingles. yt-dlp
+TTS down → pre-rendered canned audio, then music-only with sweepers. yt-dlp
 broken (YouTube moved) → new ingests stall, rotation unaffected. RabbitMQ
 down → SSE metadata stops, audio keeps playing (HLS is the source of truth).
 Studio crash → k8s restart, resume publishing with a discontinuity tag,

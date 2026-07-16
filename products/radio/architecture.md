@@ -14,7 +14,7 @@ The detailed technical architecture. Subsystem design under
    algovn.com/radio/              algovn.com/radio/stream/                        api.algovn.com
    radio SPA (nginx static)       studio nginx sidecar                          api-control-plane
                                   live.m3u8 + seg-*.ts                       /radio/* ──gRPC──▶ radio-api
-                                        ▲                                    /events/radio.*  ◀── RabbitMQ "events"
+                                        ▲                                    /events/<channel> ◀── RabbitMQ "events"
                                         │ shared emptyDir                                          ▲
                                    radio-studio ───────── publishes nowplaying/queue ──────────────┘
                                         │
@@ -80,7 +80,8 @@ with the exact Cache-Control split (segments immutable, manifest no-store).
 2. User confirms (fields editable) → `POST /radio/requests {yt_id, …}` →
    `CreateRequest`: quota check (Redis), dedupe (queued track → merge
    dedication; aired < 2 h → friendly reject), INSERT `requests` row
-   (`approved`), INSERT `ingest_jobs` if the track isn't `ready`, publish
+   (`approved`, capturing the token's display-name claim for queue
+   display), INSERT `ingest_jobs` if the track isn't `ready`, publish
    `radio.queue`.
 3. Studio ingest workers: download → analyze → enrich → track `ready` →
    request `ready`.
@@ -88,8 +89,9 @@ with the exact Cache-Control split (segments immutable, manifest no-store).
    round-robin order → brain brief (with dedication digest) → TTS →
    render (intro + track, pre-segmented) → request `queued`.
 5. Publisher: segments air on the wall clock → `play_history` row, request
-   `aired`, `radio.nowplaying` published → SPA flips the card when the
-   listener's `PROGRAM-DATE-TIME` catches up.
+   `aired`, the `radio:nowplaying` Redis snapshot rewritten (what
+   `GetNowPlaying` serves) and the `radio.nowplaying` event published →
+   SPA flips the card when the listener's `PROGRAM-DATE-TIME` catches up.
 
 **Playlist import**: admin `POST /radio/admin/import {url}` →
 `--flat-playlist -J` expands entries → one `ingest_job` per entry
@@ -103,9 +105,17 @@ next slot boundary, wake jingle + `wake_greeting` brief. Sleep is the
 mirror: count 0 for 10 min → music-only (brain/voice idle).
 
 **Budget trip**: every brain/voice call runs through `spend` — price
-computed at write, `INCRBY radio:spend:<date>` (atomic; midnight key
-rollover). Meter ≥ cap → director flag: canned/music-only until tomorrow;
-alert at 80% and at trip.
+computed at write, `INCRBY radio:spend:<date>` (atomic; midnight
+Asia/Ho_Chi_Minh key rollover). Meter ≥ cap → director flag:
+canned/music-only until tomorrow; alert at 80% and at trip.
+
+**Skip** (admin): drop the current item's unpublished segments; the
+publisher jumps to the next item boundary at its next tick —
+pre-rendering makes skips cheap and gapless.
+
+**Standby**: if the buffer is truly empty (first deploy, library still
+ingesting), the publisher loops a canned branded standby bed rather than
+starving the manifest — never dead air, never a stalled player.
 
 ## Contract sketch — `algovn.radio.v1`
 
@@ -121,7 +131,7 @@ service RadioService {
   rpc CreateRequest(CreateRequestRequest) returns (CreateRequestResponse);
   rpc CreateShoutout(CreateShoutoutRequest) returns (CreateShoutoutResponse);
   rpc ListMyRequests(ListMyRequestsRequest) returns (ListMyRequestsResponse);
-  // role:radio-admin
+  // role:admin
   rpc ImportPlaylist(ImportPlaylistRequest) returns (ImportPlaylistResponse);
   rpc SkipCurrent(SkipCurrentRequest) returns (SkipCurrentResponse);
   rpc RemoveRequest(RemoveRequestRequest) returns (RemoveRequestResponse);
@@ -174,6 +184,10 @@ job:      queued ─▶ running ─▶ done
                     running ─▶ stalled (extractor_broken, alerts)
 ```
 
+`queued` means rendered and waiting to air; `aired` stamps when the item's
+first segment publishes. Shoutouts share the request machine minus the
+ingest states (pending → approved → aired | rejected).
+
 **Redis keys**: `radio:presence` (ZSET, member=session UUID, score=last
 beat; count = range over 90 s), `radio:nowplaying` (JSON snapshot),
 `radio:quota:<sub>:<yyyymmdd>` (INCR, TTL 48 h), `radio:spend:<yyyymmdd>`
@@ -195,11 +209,13 @@ manifest from `radio:hls:seq` + discontinuity, re-render the buffer.
 | Deployment `radio-api` | 2 replicas, stateless; headless Service :9090 `grpc`, :9091 `metrics`; native gRPC health probes |
 | Deployment `radio-studio` | 1 replica, `Recreate`; media PVC (RWO, local-path, 20 Gi); HLS emptyDir shared with nginx sidecar; Service :8080 for the stream |
 | Ingress `radio-stream` | `algovn.com/radio/stream/*` → nginx sidecar; Kong rate-limit tier sized for manifest polling |
-| SPA | `web/apps/radio` → nginx static image, Ingress `algovn.com/radio/`, CF cache rule on `assets/*` (mandatory) + `stream/seg-*` (this product's addition) |
-| Registration YAML | `iac/apps/api-control-plane/registrations/radio.yaml` — the routes table in [`../radio.md`](../radio.md); generous timeout on `/radio/resolve`; dev copy in `dev/registrations` (both must change together) |
-| ExternalSecrets | `radio-llm` (Gemini/Anthropic key), `radio-tts` (GCP SA), `radio-youtube-cookies` (optional, default absent) — all from OpenBao via ESO |
+| `iac/apps/radio-web/` | the SPA is its own app, mirroring `the-button-web`: namespace, deployment (nginx static image built from `web/apps/radio`), Service, Ingress `algovn.com/radio/`, registry-creds ExternalSecret. Kong longest-prefix matching keeps `/radio/` (SPA) and `/radio/stream/` (studio) disjoint on one host. CF cache rules: `assets/*` (mandatory) + `stream/seg-*` |
+| Registration YAML | `iac/apps/api-control-plane/registrations/radio.yaml` — the routes table in [`../radio.md`](../radio.md); generous `deadline` on `/radio/resolve`; declares channels `radio.nowplaying` + `radio.queue` (`anonymous`); dev copy in `dev/registrations` (both must change together) |
+| ExternalSecrets | product secrets: `radio-llm` (Gemini/Anthropic key), `radio-tts` (GCP SA), `radio-youtube-cookies` (optional, default absent) — plus the platform boilerplate The Button also carries: `amqp-creds` (shared `secret/algovn/shared/amqp-events`), `pg-radio` (CNPG owner creds), `redis-creds`, `registry-creds` (both namespaces). All from OpenBao via ESO |
+| NetworkPolicy, PDB | mirror the-button: admit api-control-plane → radio-api:9090 and Kong → studio nginx:8080; PodDisruptionBudget on radio-api |
 | ConfigMaps | `radio-config` (knobs below), `radio-persona` (the bible) |
 | CNPG | database `radio` + owner role, declarative onboarding |
+| Zitadel (console, once) | project `radio` with coarse role `admin`; SPA application Web + PKCE with **Auth Token Type: JWT** and `accessTokenRoleAssertion` enabled — both known gotchas (opaque tokens 401 at the gateway; roles claim absent without assertion) |
 | VMServiceScrape ×2, VMRule | metrics + the alert set (staleness, underrun, spend, ingest spikes) |
 | Argo Application | app-of-apps entry; merge to `main` is the only deploy path |
 
@@ -207,7 +223,8 @@ manifest from `radio:hls:seq` + discontinuity, re-render the buffer.
 
 | Key | Default |
 | --- | ------- |
-| `talk.min_songs` / `talk.max_songs` | 1 / 2 (chatty) |
+| `station.timezone` | Asia/Ho_Chi_Minh — clock, quota days, spend reset |
+| `talk.min_songs` / `talk.max_songs` | 1 / 2 — director draws uniformly per gap (chatty) |
 | `talk.musings_per_hour_min` | 1 |
 | `buffer.target_seconds` | 180 |
 | `hls.segment_seconds` / `hls.window_segments` | 4 / 15 |
@@ -236,8 +253,9 @@ the studio's 1 Gi memory limit is the only new reservation that matters.
 
 AuthN terminates at the control plane (JWKS-verified JWT); `radio-api`
 does a read-only claims decode and never re-verifies (platform contract).
-`role:radio-admin` guards admin routes at the gateway; the service
-double-checks the role claim on admin methods (belt and suspenders, free).
+`role:admin` guards admin routes at the gateway (coarse role in the
+`radio` Zitadel project, per authnz conventions); the service
+double-checks the claim on admin methods (belt and suspenders, free).
 The studio accepts no inbound traffic except nginx's stream files; its
 egress (YouTube, LLM, TTS, Open-Meteo) rides the home residential IP.
 Injection rails per [`dj-brain.md`](dj-brain.md); moderation and quota

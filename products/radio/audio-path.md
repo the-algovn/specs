@@ -19,6 +19,9 @@ wall clock — when a segment's air time arrives, it appears in the manifest.
 - A studio restart resumes at "next unpublished segment" with one
   `EXT-X-DISCONTINUITY`. State is a manifest position, not an encoder
   mid-stream.
+- If the buffer is truly empty (first deploy, library still ingesting),
+  the publisher loops a canned standby bed rather than starving the
+  manifest — never dead air, never a stalled player.
 
 ## The program director
 
@@ -28,16 +31,18 @@ the playhead. When it runs low it picks the next item:
 1. Pending requests first — round-robin across requesters, FIFO within one.
 2. Otherwise auto-rotation from the library — no-repeat window; mood/era
    tags exist from ingest; daypart-aware *selection* lands in Phase 3.
-3. Talk slots per the chatty clock: every 1–2 songs (type chosen by the
-   director — see [`dj-brain.md`](dj-brain.md)), at least one musing per
-   hour, the hourly station ID.
+3. Talk slots per the chatty clock: every 1–2 songs, drawn uniformly per
+   gap (type chosen by the director — see [`dj-brain.md`](dj-brain.md)),
+   at least one musing per hour, the hourly station ID.
 
 A crash never catches the stream mid-word — the "live" is rendered seconds
-ahead, like real radio automation.
+ahead, like real radio automation. An admin skip drops the current item's
+unpublished segments and jumps to the next boundary — pre-rendering makes
+it cheap and gapless.
 
 ## Transitions
 
-MVP joins items with short fade-out/fade-in and lets DJ talk and jingle
+MVP joins items with short fade-out/fade-in and lets DJ talk and sweeper
 stings cover the seams — which is how old-school radio actually sounded.
 True crossfades are Phase 3, baked at render time (item N+1 renders mixed
 with item N's tail) so the scheduler stays a dumb concatenator forever.
@@ -56,10 +61,12 @@ SPA players send an anonymous heartbeat (session UUID) every 30 s →
 `radio:presence` ZSET scored by timestamp; the listener count is a range
 count over the last 90 s. Kong rate-limits the endpoint per-IP.
 
-- Zero listeners for 10 minutes → **music-only mode**: no LLM/TTS calls,
-  rotation continues, jingles still air.
-- First heartbeat → the DJ returns at the next slot boundary with a jingle
-  and a proper wake greeting. She never greets individual joins.
+- Zero listeners for 10 minutes (the timer starts at the transition to
+  zero) → **music-only mode**: no LLM/TTS calls, rotation continues,
+  canned sweepers still air.
+- First heartbeat → the DJ returns at the next slot boundary with a
+  station sweeper and a proper wake greeting. She never greets individual
+  joins.
 - Requesting a song implies presence: the requester's own heartbeat wakes
   the station.
 - The daily budget cap (see [`../radio.md`](../radio.md), Abuse & safety)

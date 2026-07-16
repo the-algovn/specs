@@ -66,7 +66,8 @@ stage canonicalizes YouTube titles).
 
 ## The parse/moderation call (the brain's sibling)
 
-One LLM call per call-in submission returns
+One LLM call per submission — song requests and standalone shoutouts alike
+(a shoutout simply has no song query) — returns
 `{song_query, recipient, message, verdict, sanitized_digest, weight}`.
 Rejections (abuse, doxxing, spam, ads) surface to the user with the reason.
 The sanitized digest is the only form of user text that ever reaches an
@@ -100,9 +101,9 @@ the bill annoys.
 1. LLM error or 8 s timeout → **canned template pool** per segment type:
    10–15 handwritten, time-aware variants each (Go text/template), still
    TTS'd live.
-2. TTS down → **pre-rendered canned audio** (station IDs, generic sweepers
-   — a fixed set generated once at build time for cents) or skip to
-   jingle.
+2. TTS down → **pre-rendered canned audio** (station IDs, sweepers, the
+   standby bed — all TTS-generated once at build time for cents;
+   **musical** jingles are the Phase-3 package) or skip to a sweeper.
 3. Both down → music-only. Never dead air.
 
 ## Example (to nail the voice)
