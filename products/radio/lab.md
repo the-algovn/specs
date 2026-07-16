@@ -36,23 +36,24 @@ The shell is platform infrastructure; benches are plug-ins:
   invoke → result pane with JSON / audio-player / cost tabs) and the
   **Ledger drawer** (session spend from the lab backend).
 
-## Auth — the platform's first real OIDC SPA app
+## Auth — a real OIDC SPA app from day one
 
-Phase 0 deliberately exercises the production auth path months early. It
-creates the first Zitadel SPA application on the platform:
+Phase 0 deliberately exercises the production auth path. The Button
+already proved the SPA sign-in pattern (project `the-thing`,
+`oidc-client-ts`, in-memory tokens); the console copies that pattern and
+adds its own Zitadel application:
 
 - Zitadel project **`console`**, coarse role **`admin`**, granted to the
   owner.
 - Application: Web + PKCE, redirect `http://localhost:5174`, with both
   documented gotchas applied — **Auth Token Type: JWT** (else the gateway
   401s) and **`accessTokenRoleAssertion`** (else no roles claim).
-- The console signs in via `oidc-client-ts`, token held in memory only.
+- The console signs in via `oidc-client-ts` (pattern copied from
+  The Button's `lib/auth.ts`), token held in memory only.
 - Every lab route registers `rule: role:admin`; the local gateway verifies
-  against real Zitadel JWKS. Logging into your own local lab with your
+  against real Zitadel JWKS — and its `AUDIENCE` allowlist gains the
+  console project + client ids. Logging into your own local lab with your
   real account IS the test.
-
-Side effect: the OIDC wiring pattern the deferred The Button sign-in work
-needs will now exist in the monorepo.
 
 ## Deliverable 2 — the lab backend
 
