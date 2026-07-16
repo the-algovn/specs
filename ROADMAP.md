@@ -5,7 +5,10 @@ the README portfolio table.
 
 ## Now
 
-Nothing in flight. The Button shipped (2026-07) — see
+**Tần Số 42** — spec approved (2026-07-16); implementation planning is the
+next step. See [`products/radio.md`](products/radio.md).
+
+The Button shipped (2026-07) — see
 [`products/the-button.md`](products/the-button.md) for status and known limits.
 Follow-ups, not blockers: confirm the 10k-concurrent SSE target holds after the
 cloudflared memory resize (re-run of the ramp in
