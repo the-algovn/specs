@@ -176,6 +176,10 @@ Full conventions: `iac/docs/grpc-conventions.md`. Manifest skeleton:
   burn keys (`pow:<id>`) are what prevent a spent challenge token from being
   replayed, so an eviction there silently double-credits clicks the same way a
   data loss would.
+  Admin UI: Redis Insight at `redis.algovn.com`, gated by oauth2-proxy → Zitadel
+  (project `internal-tool`, single `admin` role) plus an email allowlist, with
+  NetworkPolicy making the proxy the only route to it. See iac
+  `docs/runbooks/redisinsight.md`.
 - **RabbitMQ** — single node, topic exchange `events`. The transport behind SSE.
   The request path never depends on it: if RabbitMQ is down, SSE fails and clients
   fall back to polling, but reads and writes keep working.
