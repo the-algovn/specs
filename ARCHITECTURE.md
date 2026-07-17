@@ -227,16 +227,15 @@ Everything below is already built. A new product does not redesign any of it:
 
 **The Button** — see [`products/the-button.md`](products/the-button.md).
 
-Backend complete and platform prerequisites live: the `algovn.button.v1` contract
-is published, `the-button-service` implements proof-of-work gating, click batching,
-achievements and the tick leader, Redis is deployed, and the gateway's per-route
-rate limits and error mappings are in place.
-
-Not yet shipped: the service is **not deployed** (no `iac/apps/the-button/`, no
-Argo Application, no `the_button` database), it is **not registered** with the
-control plane, and the **SPA does not exist**. `api.algovn.com/the-button` routes
-to the control plane, which has no registration for that prefix. See
-[`ROADMAP.md`](ROADMAP.md).
+Live in production since 2026-07-16, at
+[algovn.com/the-button](https://algovn.com/the-button) with its API registered at
+`api.algovn.com/the-button`. The `algovn.button.v1` contract is split across two
+Deployments: **api** (2 replicas) does proof-of-work-gated click batching and
+serves achievements; the single-replica **publisher** polls Postgres's
+`SUM(user_clicks)` every second and broadcasts counter and milestone frames to
+RabbitMQ for the gateway's SSE hub. Postgres is the sole counter truth — the
+earlier Redis counter, transactional outbox, and leader-elected tick publisher
+are gone.
 
 ---
 
