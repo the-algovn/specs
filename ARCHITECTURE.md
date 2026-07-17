@@ -167,18 +167,32 @@ Full conventions: `iac/docs/grpc-conventions.md`. Manifest skeleton:
 
 - **Postgres** — one shared CNPG cluster on `algovn-w1`. Each product gets its own
   database and owner role, declaratively onboarded, credentials in OpenBao. Currently
-  hosts `zitadel` and `openfga`.
+  hosts `zitadel`, `openfga`, and `the_button`.
 - **Redis** — single instance, AOF `everysec` + RDB. Hot control state only:
   counters, throttles, short-lived tokens. Written cluster-mode-ready by
   construction (single-key ops only), so it can shard later without an app rewrite.
   **`maxmemory-policy` must be `noeviction`**: products such as
-  `the-button-service` depend on specific keys (e.g. `counter:global`,
-  `applied:*` idempotency markers) never being evicted under memory pressure —
-  an eviction there silently corrupts exactly-once accounting the same way a
+  `the-button-service` depend on specific keys never being evicted — its PoW
+  burn keys (`pow:<id>`) are what prevent a spent challenge token from being
+  replayed, so an eviction there silently double-credits clicks the same way a
   data loss would.
 - **RabbitMQ** — single node, topic exchange `events`. The transport behind SSE.
   The request path never depends on it: if RabbitMQ is down, SSE fails and clients
   fall back to polling, but reads and writes keep working.
+- **Schema — sqlc + goose migrations.** Every Go service owning a database uses
+  sqlc for its data-access layer and goose for schema changes. Migrations are
+  numbered SQL files under `internal/db/migrations/`, embedded with `go:embed`,
+  and applied by a dedicated `*-migrate` binary run as an Argo **PreSync hook
+  Job** — never by the service at startup, and never by hand. sqlc reads the
+  migrations directory directly, so the migrations are the single source of
+  truth; there is no separate `schema.sql`. Because the PreSync hook runs
+  **before** the new pods roll, every migration must be backward-compatible with
+  the version still serving traffic (expand/contract: add nullable, backfill,
+  drop only in a later release). This replaces the earlier idempotent
+  startup-apply: a declarative apply can create and alter, but it cannot express
+  a destructive or data-dependent change — the 2026-07-17 `counter_outbox` drop
+  had to ship as a manual runbook step, which is the gap migrations close.
+  `the-button-service` is the reference implementation.
 
 ## Web
 
