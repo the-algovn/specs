@@ -203,8 +203,10 @@ pnpm monorepo, Tailwind v4, shared `@algovn/ui` design system.
 - **`apps/showcase`** — the design-system showcase.
 - **Product SPAs** — React + Vite, served under a path (`base: '/<product>/'`),
   built into an nginx static image with immutable hashed assets. Auth via
-  `oidc-client-ts` against Zitadel with PKCE; the access token is held in memory
-  only.
+  `@algovn/auth` (`oidc-client-ts` against Zitadel with PKCE); the session
+  survives reloads and browser restarts — tokens live in `localStorage` and renew
+  from a rotating refresh token, so every SPA's Zitadel client must have the
+  refresh-token grant and rotation enabled.
 
 A Cloudflare cache rule on a product's `assets/*` is **mandatory before launch**,
 not an optimization: at the platform's 10k-concurrent target, uncached bundles
