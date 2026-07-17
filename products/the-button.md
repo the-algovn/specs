@@ -18,9 +18,10 @@ because the internet needs more joy · every click is a tiny rebellion.
 
 **Status:** live at [algovn.com/the-button](https://algovn.com/the-button) (2026-07).
 The `algovn.button.v1` contract is implemented end to end: `the-button-service`
-runs the proof-of-work gate, click batching, achievements and the tick leader; the
-SPA is deployed and registered with the API gateway; login, clicks, the live SSE
-counter and achievements all work in production.
+runs the proof-of-work gate, click batching and achievements, while a separate
+publisher worker keeps the live counter moving; the SPA is deployed and
+registered with the API gateway; login, clicks, the live SSE counter and
+achievements all work in production.
 
 Known limits, measured honestly: the concurrency target is 10,000 simultaneous
 users. **10,000 has never been reached. 5,000 is the only figure proven to hold** —
@@ -44,11 +45,11 @@ service's integration tests. See `iac/docs/load-results-the-button.md` and
 
 **How it works:** clicks are batched in the browser and each batch pays a
 hashcash-style proof of work, with difficulty scaling to server load; a hard
-per-user minimum interval is the real throttle. Each batch is one Postgres
-transaction (personal truth) and a transactional-outbox apply to a Redis counter
-(the public total), so the counter can never double-count a retry. A single
-elected tick leader publishes the counter once a second and claims global
-milestones exactly once.
+per-user minimum interval is the real throttle. Each batch lands in one
+Postgres transaction — the user's own click count plus any newly earned
+achievements — so a retry can never double-count; Postgres is the sole counter
+truth. A single-replica publisher polls that total every second, broadcasts it
+on change, and claims global milestones exactly once.
 
 **Platform it rides on:** api.algovn.com gateway (api-control-plane), Zitadel
 login, RabbitMQ→SSE push, shared Postgres, Redis — all described in

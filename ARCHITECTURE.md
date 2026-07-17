@@ -229,13 +229,13 @@ Everything below is already built. A new product does not redesign any of it:
 
 Live in production since 2026-07-16, at
 [algovn.com/the-button](https://algovn.com/the-button) with its API registered at
-`api.algovn.com/the-button`. The `algovn.button.v1` contract is split across two
-Deployments: **api** (2 replicas) does proof-of-work-gated click batching and
-serves achievements; the single-replica **publisher** polls Postgres's
-`SUM(user_clicks)` every second and broadcasts counter and milestone frames to
-RabbitMQ for the gateway's SSE hub. Postgres is the sole counter truth — the
-earlier Redis counter, transactional outbox, and leader-elected tick publisher
-are gone.
+`api.algovn.com/the-button`. **api** (2 replicas) implements the
+`algovn.button.v1` gRPC contract — proof-of-work-gated click batching and
+achievements; a separate single-replica **publisher** (no gRPC surface) polls
+Postgres's `SUM(user_clicks)` every second and broadcasts counter and milestone
+frames to RabbitMQ for the gateway's SSE hub. Postgres is the sole counter
+truth — the earlier Redis counter, transactional outbox, `applied:*`
+idempotency markers, and leader-elected tick publisher are gone.
 
 ---
 
