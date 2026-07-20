@@ -88,8 +88,9 @@ stream: control data through the gateway, bytes outside it.
 
 Storage: gitignored `lab-data/` (takes, downloads, renders) + an
 append-only `ledger.jsonl`. Personas live in the repo (`persona/*.md`) —
-they are product artifacts, committed. **No Postgres, no Redis, no
-RabbitMQ.**
+they are product artifacts, committed. Structured state lives in
+Postgres — the `ledger_line` table plus, as of the tracks-library
+bench, a `track` table. Still no Redis, no RabbitMQ.
 
 ## Registration — a deliberate dev-only exception
 
